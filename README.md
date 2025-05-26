@@ -23,7 +23,7 @@ This Flask application performs anomaly detection on video streams (webcam or up
 
 1. Clone this repository:
 ```
-!todo
+https://github.com/Poudel0/Anomaly-Inference
 ```
 
 2. Install required packages:
