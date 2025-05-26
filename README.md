@@ -61,16 +61,7 @@ The application uses a ResNetLSTM model trained for multi-label anomaly detectio
 - **Detection Threshold**: 0.4 (probability threshold for positive detection)
 - **Classes**: NormalVideos, Arrest, Assault, Explosion, RoadAccidents, Stealing, Vandalism
 
-## Directory Structure
 
-```
-├── app.py                     # Main Flask application
-├── templates/                 # HTML templates
-│   └── index.html             # Web interface
-├── uploads/                   # Directory for uploaded videos
-├── model_checkpoint_epoch_7.pth  # Trained model weights
-└── README.md                  # This file
-```
 
 ## Notes
 
