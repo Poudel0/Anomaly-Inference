@@ -1,0 +1,3 @@
+.env
+/uploads
+anomaly_detection_app.py

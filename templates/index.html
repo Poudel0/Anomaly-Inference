@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCTV Anomaly Detection</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+            background-color: #939090;
+        }
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .video-container {
+            position: relative;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .video-feed {
+            width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .detection-panel {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            height: 400px;
+            overflow-y: auto;
+        }
+        .detection-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .detection-normal {
+            background-color: #d4edda;
+        }
+        .detection-anomaly {
+            background-color: #f8d7da;
+        }
+        .progress-container {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-container">
+        <h1 class="text-center mb-4">CCTV Anomaly Detection</h1>
+
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Upload Video File</h5>
+                        <form id="upload-form" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <input class="form-control" type="file" id="video-file" accept=".mp4,.avi,.mov,.mkv">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Upload & Process</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="video-container">
+                    <img class="video-feed" id="video-display" src="">
+                </div>
+                <div class="d-flex justify-content-center mt-3">
+                    <div class="spinner-border text-primary d-none" id="loading-spinner" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header bg-dark text-white">
+                        Detection Results
+                    </div>
+                    <div class="card-body detection-panel" id="detection-results">
+                        <div class="text-center text-muted">
+                            No detections yet
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header bg-dark text-white">System Status</div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>Current Source:</span>
+                            <span id="current-source">Uploaded Video (None)</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>Processing Rate:</span>
+                            <span>3 FPS (1 frame every 333ms)</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>Sequence Length:</span>
+                            <span>32 frames</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>Detection Threshold:</span>
+                            <span>0.4</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const uploadForm = document.getElementById('upload-form');
+            const videoDisplay = document.getElementById('video-display');
+            const detectionResults = document.getElementById('detection-results');
+            const currentSource = document.getElementById('current-source');
+            const loadingSpinner = document.getElementById('loading-spinner');
+
+            let resultsInterval = null;
+
+            uploadForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+
+                const fileInput = document.getElementById('video-file');
+                const file = fileInput.files[0];
+
+                if (!file) {
+                    alert('Please select a video file first');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                loadingSpinner.classList.remove('d-none');
+
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            videoDisplay.src = `{{ url_for('video_feed') }}?source=file&path=${data.filepath}`;
+                            currentSource.textContent = `Uploaded Video: ${data.filename}`;
+                            startResultsPolling();
+                        } else {
+                            alert('Error: ' + data.error);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Upload error:', error);
+                        alert('An error occurred during upload');
+                    })
+                    .finally(() => {
+                        loadingSpinner.classList.add('d-none');
+                    });
+            });
+
+            function startResultsPolling() {
+                if (resultsInterval) clearInterval(resultsInterval);
+                resultsInterval = setInterval(fetchResults, 1000);
+            }
+
+            function fetchResults() {
+                fetch('/results')
+                    .then(response => response.json())
+                    .then(results => updateDetectionPanel(results))
+                    .catch(error => console.error('Fetch results error:', error));
+            }
+
+            function updateDetectionPanel(results) {
+                if (Object.keys(results).length === 0) return;
+                detectionResults.innerHTML = '';
+
+                const timestampDiv = document.createElement('div');
+                timestampDiv.className = 'mb-3 text-muted';
+                timestampDiv.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+                detectionResults.appendChild(timestampDiv);
+
+                const sortedClasses = Object.keys(results).sort((a, b) => {
+                    return results[b].probability - results[a].probability;
+                });
+
+                for (const cls of sortedClasses) {
+                    const result = results[cls];
+                    if (!result.detected) continue;
+
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = `detection-item ${cls === 'NormalVideos' ? 'detection-normal' : 'detection-anomaly'}`;
+
+                    const header = document.createElement('h5');
+                    header.textContent = cls;
+
+                    const progressContainer = document.createElement('div');
+                    progressContainer.className = 'progress-container';
+
+                    const progress = document.createElement('div');
+                    progress.className = 'progress';
+
+                    const progressBar = document.createElement('div');
+                    progressBar.className = `progress-bar ${cls === 'NormalVideos' ? 'bg-success' : 'bg-danger'}`;
+                    progressBar.style.width = `${result.probability * 100}%`;
+                    progressBar.textContent = `${(result.probability * 100).toFixed(1)}%`;
+
+                    progress.appendChild(progressBar);
+                    progressContainer.appendChild(progress);
+                    itemDiv.appendChild(header);
+                    itemDiv.appendChild(progressContainer);
+                    detectionResults.appendChild(itemDiv);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
