@@ -2,6 +2,8 @@
 
 This Flask application performs anomaly detection on video streams (webcam or uploaded videos) using a pre-trained ResNetLSTM model. The model can detect various anomalies including Arrest, Assault, Explosion, Road Accidents, Stealing, and Vandalism.
 
+Demo model available at : https://www.kaggle.com/models/poudel0/major_project_checkpoint_epoch_7
+
 ## Features
 
 - Real-time webcam processing with anomaly detection
